@@ -25,8 +25,9 @@ def relu(x):
 # TODO: check if i the neurons are [n,1] or [1,n]
 
 
-def activation_function(inputs, weights):
-    neurons = np.empty([1, len(weights)])
+def activation_function(inputs, weights, num_neurons):
+
+    neurons = np.empty([1, num_neurons])
     for i in range(len(weights)):
         dot_product = np.dot(inputs, weights[i])
         parenthesis = dot_product+bias[i]
@@ -34,8 +35,7 @@ def activation_function(inputs, weights):
 
     return neurons
 
-
-print(activation_function(inputs, weights))
+# print(activation_function(inputs, weights))
 
 # this is one neuron with n inputs
 # %%
@@ -44,4 +44,4 @@ print(activation_function(inputs, weights))
 # the inputs remain the same
 
 
-neurons_3 = activation_function(inputs, weights)
+neurons_3 = activation_function(inputs, weights, len(weights))
