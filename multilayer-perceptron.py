@@ -98,7 +98,7 @@ class Layer_Dense:
 
 
 layer_1 = Layer_Dense(2, 3)  # 2 bacause we have x y attributes no more
-layer_2 = Layer_Dense(3, 2)
+layer_2 = Layer_Dense(3, 3)
 
 activation_1 = Activation_ReLU()
 activation_2 = Activation_Softmax()
@@ -110,4 +110,4 @@ activation_1.forward(layer_1.output)
 layer_2.forward(activation_1.output)
 
 activation_2.forward(layer_2.output)
-print(layer_2.output)
+print(activation_2.output[:5])
