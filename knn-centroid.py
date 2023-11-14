@@ -20,6 +20,7 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import NearestCentroid  # kmeans clustering
 from tensorflow.keras.datasets import cifar10  # to import our data
+from tensorflow import keras
 import random
 
 # Load CIFAR-10 dataset
