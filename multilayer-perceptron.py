@@ -741,15 +741,34 @@ class Layer_Dense:
 # a learning rate which for now will be 1.
 # it is one of th esimplest optimizers to use
 # =============================================================================
-
+# =============================================================================
+#
+# we can start with big learning rate and the change the leraning raet as we move forward.
+# This way we can start with bigger step towarsd global minimum (and get away from local minimums)
+# and as we go towards our goal, decrease the learning rate so that it find the global minimum
+#
+# =============================================================================
 class Optimizer_SGD:
 
-    def __init__(self, learning_rate=1.0):
+    def __init__(self, learning_rate=1.0, decay=0.):
         self.learning_rate = learning_rate
+        self.current_learning_rate = learning_rate
+        self.decay = decay
+        self.iterations = 0
+
+    def pre_update_params(self):
+
+        if self.decay:
+            self.current_learning_rate = self.learning_rate / \
+                (1. + self.decay * self.iterations)
 
     def update_params(self, layer):
-        layer.weights += -self.learning_rate * layer.dweights
-        layer.biases += -self.learning_rate * layer.dbiases
+        layer.weights += -self.current_learning_rate * layer.dweights
+        layer.biases += -self.current_learning_rate * layer.dbiases
+
+    def post_update_params(self):
+
+        self.iterations += 1
 
 # # SGD optimizer
 # class Optimizer_SGD:
@@ -764,8 +783,7 @@ class Optimizer_SGD:
 #         layer.weights += -self.learning_rate * layer.dweights
 #         layer.biases += -self.learning_rate * layer.dbiases
 
-
-optimizer = Optimizer_SGD()
+# optimizer = Optimizer_SGD()
 
 # optimizer.update_params(dense1)
 # optimizer.update_params(dense2)
@@ -789,7 +807,8 @@ loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
 
 
 # Create optimizer
-optimizer = Optimizer_SGD()
+optimizer = Optimizer_SGD(
+    learning_rate=2.5, decay=1e-3)  # 2.5 has 83% accuracy
 
 # Train in loop
 for epoch in range(10001):
