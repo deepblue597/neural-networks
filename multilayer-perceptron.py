@@ -750,11 +750,12 @@ class Layer_Dense:
 # =============================================================================
 class Optimizer_SGD:
 
-    def __init__(self, learning_rate=1.0, decay=0.):
+    def __init__(self, learning_rate=1.0, decay=0., momentum=0.):
         self.learning_rate = learning_rate
         self.current_learning_rate = learning_rate
         self.decay = decay
         self.iterations = 0
+        self.momentum = momentum
 
     def pre_update_params(self):
 
@@ -763,8 +764,30 @@ class Optimizer_SGD:
                 (1. + self.decay * self.iterations)
 
     def update_params(self, layer):
-        layer.weights += -self.current_learning_rate * layer.dweights
-        layer.biases += -self.current_learning_rate * layer.dbiases
+
+        if self.momentum:
+
+            if not hasattr(layer, 'weight_momentums'):
+
+                layer.weight_momentums = np.zeros_like(layer.weights)
+
+                layer.bias_momentums = np.zeros_like(layer.biases)
+
+            # takes a percentage of the previous weight and adds it to the current change of weight
+            # this way the momentum from the prev changes impact the new changes so that we dont get stuck in
+            # a local minimum
+            layer.weight_momentums = self.momentum * layer.weight_momentums - \
+                self.current_learning_rate * layer.dweights
+
+            layer.weights += layer.weight_momentums
+
+            layer.bias_momentums = self.momentum * layer.bias_momentums - \
+                self.current_learning_rate * layer.dbiases
+            layer.biases += layer.bias_momentums
+
+        else:
+            layer.weights += -self.current_learning_rate * layer.dweights
+            layer.biases += -self.current_learning_rate * layer.dbiases
 
     def post_update_params(self):
 
@@ -793,25 +816,27 @@ class Optimizer_SGD:
 
 
 # Create Dense layer with 2 input features and 64 output values
-dense1 = Layer_Dense(2, 64)
+dense1 = Layer_Dense(2, 32)
 
 # Create ReLU activation (to be used with Dense layer):
 activation1 = Activation_ReLU()
 
 # Create second Dense layer with 64 input features (as we take output
 # of previous layer here) and 3 output values (output values)
-dense2 = Layer_Dense(64, 3)
+dense2 = Layer_Dense(32, 3)
 
 # Create Softmax classifier's combined loss and activation
 loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
 
 
 # Create optimizer
-optimizer = Optimizer_SGD(
-    learning_rate=2.5, decay=1e-3)  # 2.5 has 83% accuracy
+optimizer = Optimizer_SGD(learning_rate=1, decay=1e-3,
+                          momentum=0.8)  # 2.5 has 83% accuracy
+# learning_rate=2 , decay = 1e-3 , momentum=0.5 --> 88.7 % accuracy
+# learning_rate=1.5 , decay = 1e-3 , momentum=0.8 --> 91 % accurcay 128 hidden neurons
 
 # Train in loop
-for epoch in range(10001):
+for epoch in range(4001):
 
     # Perform a forward pass of our training data through this layer
     dense1.forward(X)
@@ -848,3 +873,33 @@ for epoch in range(10001):
     # Update weights and biases
     optimizer.update_params(dense1)
     optimizer.update_params(dense2)
+
+
+# Validate the model
+
+# Create test dataset
+X_test, y_test = spiral_data(samples=100, classes=3)
+
+# Perform a forward pass of our testing data through this layer
+dense1.forward(X_test)
+
+# Perform a forward pass through activation function
+# takes the output of first dense layer here
+activation1.forward(dense1.output)
+
+# Perform a forward pass through second Dense layer
+# takes outputs of activation function of first layer as inputs
+dense2.forward(activation1.output)
+
+# Perform a forward pass through the activation/loss function
+# takes the output of second dense layer here and returns loss
+loss = loss_activation.forward(dense2.output, y_test)
+
+# Calculate accuracy from output of activation2 and targets
+# calculate values along first axis
+predictions = np.argmax(loss_activation.output, axis=1)
+if len(y_test.shape) == 2:
+    y_test = np.argmax(y_test, axis=1)
+accuracy = np.mean(predictions == y_test)
+
+print(f'validation, acc: {accuracy:.3f}, loss: {loss:.3f}')
