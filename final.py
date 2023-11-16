@@ -1,3 +1,15 @@
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov 16 15:42:05 2023
+
+@author: jason
+"""
+
+# to make the confusion matrix into a heatmap
+from sklearn.metrics import classification_report
+import seaborn as sns  # for data visualization% matplotlib inline
 import numpy as np
 import nnfs
 import os
@@ -5,11 +17,13 @@ import cv2
 from tensorflow.keras.datasets import cifar10  # to import our data
 import matplotlib.pyplot as plt  # for data visualization purposes
 import random
-
+from sklearn.metrics import confusion_matrix  # To check for TP , TN , FP , FN
 nnfs.init()
 
 
 # Dense layer
+
+
 class Layer_Dense:
 
     # Layer initialization
@@ -19,11 +33,6 @@ class Layer_Dense:
         # Initialize weights and biases
         self.weights = 0.01 * np.random.randn(n_inputs, n_neurons)
         self.biases = np.zeros((1, n_neurons))
-        # Set regularization strength
-        self.weight_regularizer_l1 = weight_regularizer_l1
-        self.weight_regularizer_l2 = weight_regularizer_l2
-        self.bias_regularizer_l1 = bias_regularizer_l1
-        self.bias_regularizer_l2 = bias_regularizer_l2
 
     # Forward pass
     def forward(self, inputs, training):
@@ -38,67 +47,16 @@ class Layer_Dense:
         self.dweights = np.dot(self.inputs.T, dvalues)
         self.dbiases = np.sum(dvalues, axis=0, keepdims=True)
 
-        # Gradients on regularization
-        # L1 on weights
-        if self.weight_regularizer_l1 > 0:
-            dL1 = np.ones_like(self.weights)
-            dL1[self.weights < 0] = -1
-            self.dweights += self.weight_regularizer_l1 * dL1
-        # L2 on weights
-        if self.weight_regularizer_l2 > 0:
-            self.dweights += 2 * self.weight_regularizer_l2 * \
-                self.weights
-        # L1 on biases
-        if self.bias_regularizer_l1 > 0:
-            dL1 = np.ones_like(self.biases)
-            dL1[self.biases < 0] = -1
-            self.dbiases += self.bias_regularizer_l1 * dL1
-        # L2 on biases
-        if self.bias_regularizer_l2 > 0:
-            self.dbiases += 2 * self.bias_regularizer_l2 * \
-                self.biases
-
         # Gradient on values
         self.dinputs = np.dot(dvalues, self.weights.T)
 
 
-# Dropout
-class Layer_Dropout:
-
-    # Init
-    def __init__(self, rate):
-        # Store rate, we invert it as for example for dropout
-        # of 0.1 we need success rate of 0.9
-        self.rate = 1 - rate
+# Input "layer"
+class Layer_Input:
 
     # Forward pass
     def forward(self, inputs, training):
-        # Save input values
-        self.inputs = inputs
-
-        # If not in the training mode - return values
-        if not training:
-            self.output = inputs.copy()
-            return
-
-        # Generate and save scaled mask
-        self.binary_mask = np.random.binomial(1, self.rate,
-                                              size=inputs.shape) / self.rate
-        # Apply mask to output values
-        self.output = inputs * self.binary_mask
-
-    # Backward pass
-    def backward(self, dvalues):
-        # Gradient on values
-        self.dinputs = dvalues * self.binary_mask
-
-
-# Input "layer"
-# class Layer_Input:
-
-#     # Forward pass
-#     def forward(self, inputs, training):
-#         self.output = inputs
+        self.output = inputs
 
 
 # ReLU activation
@@ -167,45 +125,6 @@ class Activation_Softmax:
         return np.argmax(outputs, axis=1)
 
 
-# Sigmoid activation
-class Activation_Sigmoid:
-
-    # Forward pass
-    def forward(self, inputs, training):
-        # Save input and calculate/save output
-        # of the sigmoid function
-        self.inputs = inputs
-        self.output = 1 / (1 + np.exp(-inputs))
-
-    # Backward pass
-    def backward(self, dvalues):
-        # Derivative - calculates from output of the sigmoid function
-        self.dinputs = dvalues * (1 - self.output) * self.output
-
-    # Calculate predictions for outputs
-    def predictions(self, outputs):
-        return (outputs > 0.5) * 1
-
-
-# Linear activation
-class Activation_Linear:
-
-    # Forward pass
-    def forward(self, inputs, training):
-        # Just remember values
-        self.inputs = inputs
-        self.output = inputs
-
-    # Backward pass
-    def backward(self, dvalues):
-        # derivative is 1, 1 * dvalues = dvalues - the chain rule
-        self.dinputs = dvalues.copy()
-
-    # Calculate predictions for outputs
-    def predictions(self, outputs):
-        return outputs
-
-
 # SGD optimizer
 class Optimizer_SGD:
 
@@ -264,100 +183,6 @@ class Optimizer_SGD:
         # vanilla or momentum updates
         layer.weights += weight_updates
         layer.biases += bias_updates
-
-    # Call once after any parameter updates
-    def post_update_params(self):
-        self.iterations += 1
-
-
-# Adagrad optimizer
-class Optimizer_Adagrad:
-
-    # Initialize optimizer - set settings
-    def __init__(self, learning_rate=1., decay=0., epsilon=1e-7):
-        self.learning_rate = learning_rate
-        self.current_learning_rate = learning_rate
-        self.decay = decay
-        self.iterations = 0
-        self.epsilon = epsilon
-
-    # Call once before any parameter updates
-
-    def pre_update_params(self):
-        if self.decay:
-            self.current_learning_rate = self.learning_rate * \
-                (1. / (1. + self.decay * self.iterations))
-
-    # Update parameters
-    def update_params(self, layer):
-
-        # If layer does not contain cache arrays,
-        # create them filled with zeros
-        if not hasattr(layer, 'weight_cache'):
-            layer.weight_cache = np.zeros_like(layer.weights)
-            layer.bias_cache = np.zeros_like(layer.biases)
-
-        # Update cache with squared current gradients
-        layer.weight_cache += layer.dweights**2
-        layer.bias_cache += layer.dbiases**2
-
-        # Vanilla SGD parameter update + normalization
-        # with square rooted cache
-        layer.weights += -self.current_learning_rate * \
-            layer.dweights / \
-            (np.sqrt(layer.weight_cache) + self.epsilon)
-        layer.biases += -self.current_learning_rate * \
-            layer.dbiases / \
-            (np.sqrt(layer.bias_cache) + self.epsilon)
-
-    # Call once after any parameter updates
-    def post_update_params(self):
-        self.iterations += 1
-
-
-# RMSprop optimizer
-class Optimizer_RMSprop:
-
-    # Initialize optimizer - set settings
-    def __init__(self, learning_rate=0.001, decay=0., epsilon=1e-7,
-                 rho=0.9):
-        self.learning_rate = learning_rate
-        self.current_learning_rate = learning_rate
-        self.decay = decay
-        self.iterations = 0
-        self.epsilon = epsilon
-        self.rho = rho
-
-    # Call once before any parameter updates
-
-    def pre_update_params(self):
-        if self.decay:
-            self.current_learning_rate = self.learning_rate * \
-                (1. / (1. + self.decay * self.iterations))
-
-    # Update parameters
-    def update_params(self, layer):
-
-        # If layer does not contain cache arrays,
-        # create them filled with zeros
-        if not hasattr(layer, 'weight_cache'):
-            layer.weight_cache = np.zeros_like(layer.weights)
-            layer.bias_cache = np.zeros_like(layer.biases)
-
-        # Update cache with squared current gradients
-        layer.weight_cache = self.rho * layer.weight_cache + \
-            (1 - self.rho) * layer.dweights**2
-        layer.bias_cache = self.rho * layer.bias_cache + \
-            (1 - self.rho) * layer.dbiases**2
-
-        # Vanilla SGD parameter update + normalization
-        # with square rooted cache
-        layer.weights += -self.current_learning_rate * \
-            layer.dweights / \
-            (np.sqrt(layer.weight_cache) + self.epsilon)
-        layer.biases += -self.current_learning_rate * \
-            layer.dbiases / \
-            (np.sqrt(layer.bias_cache) + self.epsilon)
 
     # Call once after any parameter updates
     def post_update_params(self):
@@ -441,43 +266,6 @@ class Optimizer_Adam:
 # Common loss class
 class Loss:
 
-    # Regularization loss calculation
-    def regularization_loss(self):
-
-        # 0 by default
-        regularization_loss = 0
-
-        # Calculate regularization loss
-        # iterate all trainable layers
-        for layer in self.trainable_layers:
-
-            # L1 regularization - weights
-            # calculate only when factor greater than 0
-            if layer.weight_regularizer_l1 > 0:
-                regularization_loss += layer.weight_regularizer_l1 * \
-                    np.sum(np.abs(layer.weights))
-
-            # L2 regularization - weights
-            if layer.weight_regularizer_l2 > 0:
-                regularization_loss += layer.weight_regularizer_l2 * \
-                    np.sum(layer.weights *
-                           layer.weights)
-
-            # L1 regularization - biases
-            # calculate only when factor greater than 0
-            if layer.bias_regularizer_l1 > 0:
-                regularization_loss += layer.bias_regularizer_l1 * \
-                    np.sum(np.abs(layer.biases))
-
-            # L2 regularization - biases
-            if layer.bias_regularizer_l2 > 0:
-                regularization_loss += layer.bias_regularizer_l2 * \
-                    np.sum(layer.biases *
-                           layer.biases)
-
-        return regularization_loss
-
-    # Set/remember trainable layers
     def remember_trainable_layers(self, trainable_layers):
         self.trainable_layers = trainable_layers
 
@@ -500,7 +288,7 @@ class Loss:
             return data_loss
 
         # Return the data and regularization losses
-        return data_loss, self.regularization_loss()
+        return data_loss  # , self.regularization_loss()
 
     # Calculates accumulated loss
     def calculate_accumulated(self, *, include_regularization=False):
@@ -513,7 +301,7 @@ class Loss:
             return data_loss
 
         # Return the data and regularization losses
-        return data_loss, self.regularization_loss()
+        return data_loss  # , self.regularization_loss()
 
     # Reset variables for accumulated loss
     def new_pass(self):
@@ -600,98 +388,6 @@ class Activation_Softmax_Loss_CategoricalCrossentropy:
         self.dinputs = self.dinputs / samples
 
 
-# Binary cross-entropy loss
-class Loss_BinaryCrossentropy(Loss):
-
-    # Forward pass
-    def forward(self, y_pred, y_true):
-
-        # Clip data to prevent division by 0
-        # Clip both sides to not drag mean towards any value
-        y_pred_clipped = np.clip(y_pred, 1e-7, 1 - 1e-7)
-
-        # Calculate sample-wise loss
-        sample_losses = -(y_true * np.log(y_pred_clipped) +
-                          (1 - y_true) * np.log(1 - y_pred_clipped))
-        sample_losses = np.mean(sample_losses, axis=-1)
-
-        # Return losses
-        return sample_losses
-
-    # Backward pass
-    def backward(self, y_pred, y_true):
-
-        # Number of samples
-        samples = len(y_pred)
-        # Number of outputs in every sample
-        # We'll use the first sample to count them
-        outputs = len(y_pred[0])
-
-        # Clip data to prevent division by 0
-        # Clip both sides to not drag mean towards any value
-        clipped_y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)
-
-        # Calculate gradient
-        self.dinputs = -(y_true / clipped_y_pred -
-                         (1 - y_true) / (1 - clipped_y_pred)) / outputs
-        # Normalize gradient
-        self.dinputs = self.dinputs / samples
-
-
-# Mean Squared Error loss
-class Loss_MeanSquaredError(Loss):  # L2 loss
-
-    # Forward pass
-    def forward(self, y_pred, y_true):
-
-        # Calculate loss
-        sample_losses = np.mean((y_true - y_pred)**2, axis=-1)
-
-        # Return losses
-        return sample_losses
-
-    # Backward pass
-    def backward(self, y_pred, y_true):
-
-        # Number of samples
-        samples = len(y_pred)
-        # Number of outputs in every sample
-        # We'll use the first sample to count them
-        outputs = len(y_pred[0])
-
-        # Gradient on values
-        self.dinputs = -2 * (y_true - y_pred) / outputs
-        # Normalize gradient
-        self.dinputs = self.dinputs / samples
-
-
-# Mean Absolute Error loss
-class Loss_MeanAbsoluteError(Loss):  # L1 loss
-
-    def forward(self, y_pred, y_true):
-
-        # Calculate loss
-        sample_losses = np.mean(np.abs(y_true - y_pred), axis=-1)
-
-        # Return losses
-        return sample_losses
-
-    # Backward pass
-
-    def backward(self, y_pred, y_true):
-
-        # Number of samples
-        samples = len(y_pred)
-        # Number of outputs in every sample
-        # We'll use the first sample to count them
-        outputs = len(y_pred[0])
-
-        # Calculate gradient
-        self.dinputs = -np.sign(y_true - y_pred) / outputs
-        # Normalize gradient
-        self.dinputs = self.dinputs / samples
-
-
 # Common accuracy class
 class Accuracy:
 
@@ -743,24 +439,6 @@ class Accuracy_Categorical(Accuracy):
         if not self.binary and len(y.shape) == 2:
             y = np.argmax(y, axis=1)
         return predictions == y
-
-
-# Accuracy calculation for regression model
-class Accuracy_Regression(Accuracy):
-
-    def __init__(self):
-        # Create precision property
-        self.precision = None
-
-    # Calculates precision value
-    # based on passed-in ground truth values
-    def init(self, y, reinit=False):
-        if self.precision is None or reinit:
-            self.precision = np.std(y) / 250
-
-    # Compares predictions to the ground truth values
-    def compare(self, predictions, y):
-        return np.absolute(predictions - y) < self.precision
 
 
 # Model class
@@ -906,10 +584,13 @@ class Model:
                 output = self.forward(batch_X, training=True)
 
                 # Calculate loss
-                data_loss, regularization_loss = \
-                    self.loss.calculate(output, batch_y,
-                                        include_regularization=True)
-                loss = data_loss + regularization_loss
+                data_loss = self.loss.calculate(output, batch_y,
+                                                )  # include_regularization=False
+                loss = data_loss  # + regularization_loss
+                # , regularization_loss = \
+                #     self.loss.calculate(output, batch_y,
+                #                         include_regularization=True)
+                # loss = data_loss + regularization_loss
 
                 # Get predictions and calculate an accuracy
                 predictions = self.output_layer_activation.predictions(
@@ -932,23 +613,36 @@ class Model:
                           f'acc: {accuracy:.3f}, ' +
                           f'loss: {loss:.3f} (' +
                           f'data_loss: {data_loss:.3f}, ' +
-                          f'reg_loss: {regularization_loss:.3f}), ' +
+                          #                          f'reg_loss: {regularization_loss:.3f}), ' +
                           f'lr: {self.optimizer.current_learning_rate}')
 
             # Get and print epoch loss and accuracy
-            epoch_data_loss, epoch_regularization_loss = \
-                self.loss.calculate_accumulated(
-                    include_regularization=True)
-            epoch_loss = epoch_data_loss + epoch_regularization_loss
+            epoch_data_loss = self.loss.calculate_accumulated(
+                include_regularization=False)  # , epoch_regularization_loss = \
+            # self.loss.calculate_accumulated(
+            #     include_regularization=True)
+            epoch_loss = epoch_data_loss  # + epoch_regularization_loss
             epoch_accuracy = self.accuracy.calculate_accumulated()
 
             print(f'training, ' +
                   f'acc: {epoch_accuracy:.3f}, ' +
                   f'loss: {epoch_loss:.3f} (' +
                   f'data_loss: {epoch_data_loss:.3f}, ' +
-                  f'reg_loss: {epoch_regularization_loss:.3f}), ' +
+                  #                  f'reg_loss: {epoch_regularization_loss:.3f}), ' +
                   f'lr: {self.optimizer.current_learning_rate}')
 
+            self.loss.calculate(output, batch_y)
+            output_for_matrix = np.argmax(output, axis=1)
+            output_for_matrix = output_for_matrix.reshape(-1, 1)
+            # Create the  confusion matrixes
+            cm_1 = confusion_matrix(batch_y, output_for_matrix)
+            heatmap_1 = sns.heatmap(cm_1, annot=True, fmt='d', cmap='YlGnBu',
+                                    xticklabels=class_names, yticklabels=class_names)
+            heatmap_1.set_title("confusion matrix for neural network")
+            plt.xlabel('Predicted')
+            plt.ylabel('Actual')
+            # print(classification_report(batch_y, output_for_matrix))
+            plt.show()
             # If there is the validation data
             if validation_data is not None:
 
@@ -980,8 +674,8 @@ class Model:
 
                     # Calculate the loss
                     self.loss.calculate(output, batch_y)
-
-                    # Get predictions and calculate an accuracy
+                    output_for_matrix = np.argmax(output, axis=1)
+                    output_for_matrix = output_for_matrix.reshape(-1, 1)
                     predictions = self.output_layer_activation.predictions(
                         output)
                     self.accuracy.calculate(predictions, batch_y)
@@ -994,6 +688,18 @@ class Model:
                 print(f'validation, ' +
                       f'acc: {validation_accuracy:.3f}, ' +
                       f'loss: {validation_loss:.3f}')
+                self.loss.calculate(output, batch_y)
+                output_for_matrix = np.argmax(output, axis=1)
+                output_for_matrix = output_for_matrix.reshape(-1, 1)
+                # Create the  confusion matrixes
+                cm_1 = confusion_matrix(batch_y, output_for_matrix)
+                heatmap_1 = sns.heatmap(
+                    cm_1, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
+                heatmap_1.set_title("confusion matrix for neural network TEST")
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                # print(classification_report(batch_y, output_for_matrix))
+                plt.show()
 
     # Performs forward pass
     def forward(self, X, training):
@@ -1048,58 +754,6 @@ class Model:
         for layer in reversed(self.layers):
             layer.backward(layer.next.dinputs)
 
-
-# Loads a MNIST dataset
-def load_mnist_dataset(dataset, path):
-
-    # Scan all the directories and create a list of labels
-    labels = os.listdir(os.path.join(path, dataset))
-
-    # Create lists for samples and labels
-    X = []
-    y = []
-
-    # For each label folder
-    for label in labels:
-        # And for each image in given folder
-        for file in os.listdir(os.path.join(path, dataset, label)):
-            # Read the image
-            image = cv2.imread(
-                os.path.join(path, dataset, label, file),
-                cv2.IMREAD_UNCHANGED)
-
-            # And append it and a label to the lists
-            X.append(image)
-            y.append(label)
-
-    # Convert the data to proper numpy arrays and return
-    return np.array(X), np.array(y).astype('uint8')
-
-
-# MNIST dataset (train + test)
-def create_data_mnist(path):
-
-    # Load both sets separately
-    X, y = load_mnist_dataset('train', path)
-    X_test, y_test = load_mnist_dataset('test', path)
-
-    # And return all the data
-    return X, y, X_test, y_test
-
-
-# Create dataset
-# X, y, X_test, y_test = create_data_mnist('fashion_mnist_images')
-
-# Shuffle the training dataset
-# keys = np.array(range(X.shape[0]))
-# np.random.shuffle(keys)
-# X = X[keys]
-# y = y[keys]
-
-# Scale and reshape samples
-# X = (X.reshape(X.shape[0], -1).astype(np.float32) - 127.5) / 127.5
-# X_test = (X_test.reshape(X_test.shape[0], -1).astype(np.float32) -
-#              127.5) / 127.5
 
 # Load CIFAR-10 dataset
 (X_train, y_train), (X_test, y_test) = cifar10.load_data()
