@@ -24,6 +24,22 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 
 from sklearn.metrics import classification_report
+
+from tensorflow.keras.datasets import cifar10  # to import our data
+
+import random
+
+#%% netpune 
+import neptune
+from neptune.version import version as neptune_client_version
+project = neptune.init_project(project="jason-k/example-project-tensorflow-keras", api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==")
+
+run = neptune.init_run(project='jason-k/example-project-tensorflow-keras',api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==")
+
+# project["general/brief"] = "/svm.py"
+# project["general/data_analysis"].upload("data_analysis.ipynb")
+# project["dataset/v0.1"].track_files("s3://datasets/images")
+# project["dataset/latest"] = project["dataset/v0.1"].fetch()
 #%% data to be imported 
 data = 'C:/Users/IASON/neural-networks/pulsar_stars.csv'
 
@@ -592,20 +608,23 @@ svc=SVC()
 
 
 # declare parameters for hyperparameter tuning
-parameters = [ {'C':[1, 10, 100, 1000], 'kernel':['linear']},
-               {'C':[1, 10, 100, 1000], 'kernel':['rbf'], 'gamma':[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
-               {'C':[1, 10, 100, 1000], 'kernel':['poly'], 'degree': [2,3,4] ,'gamma':[0.01,0.02,0.03,0.04,0.05]} 
+parameters = [ {'C':[1], 'kernel':['linear']},
+               {'C':[1 ], 'kernel':['rbf'], 'gamma':[0.1]},
+               {'C':[1], 'kernel':['poly'], 'degree': [2] ,'gamma':[0.01]} 
               ]
 
 
 
-
+ # , 0.5, 0.9
+ # ,0.03,0.05
+ # , 10, 100, 1000
 grid_search = GridSearchCV(estimator = svc,  
                            param_grid = parameters,
                            scoring = 'accuracy',
-                           cv = 5,
+                           cv = 2,
                            verbose=1)
 
+#%% Run the grid search 
 
 grid_search.fit(X_train, y_train)
 
@@ -645,6 +664,204 @@ grid_search.fit(X_train, y_train)
 # of your features, the complexity of the underlying patterns, and the overall characteristics of your dataset.
 # =============================================================================
 
+
+#%% best model 
+
+# examine the best model
+
+
+# best score achieved during the GridSearchCV
+print('GridSearch CV best score : {:.4f}\n\n'.format(grid_search.best_score_))
+
+
+# print parameters that give the best results
+print('Parameters that give the best results :','\n\n', (grid_search.best_params_))
+
+
+# print estimator that was chosen by the GridSearch
+print('\n\nEstimator that was chosen by the search :','\n\n', (grid_search.best_estimator_))
+
+#%% 
+
+# calculate GridSearch CV score on test set
+
+print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_test, y_test)))
+
+#%% CIFAR 10 dataset 
+
+# Load CIFAR-10 dataset
+(X_train, y_train), (X_test, y_test) = cifar10.load_data()
+
+# make the rgb value from 0 - 255 --> 0 - 1 ==> scaling
+X_train, X_test = X_train / 255.0, X_test / 255.0
+
+# CIFAR-10 class names
+class_names = ['airplane', 'automobile', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+
+# from 1 col mul rows --> 1 row mul cols
+print(y_train)
+y_train = y_train.reshape(-1,)
+print(y_train)
+
+print(y_test)
+y_test = y_test.reshape(-1,)
+print(y_test)
+
+# test to see if it works properly
+
+
+def showImage(x, y, index):
+    plt.figure(figsize=(15, 2))
+    plt.imshow(x[index])
+    plt.xlabel(class_names[y[index]])
+
+
+showImage(X_train, y_train, random.randint(0, 9))
+
+# the train and test data
+print(X_train.shape, X_test.shape)
+
+# Shuffle the training dataset
+keys = np.array(range(X_train.shape[0]))
+np.random.shuffle(keys)
+X_train = X_train[keys]
+y_train = y_train[keys]
+
+
+# # we want to reshape the image from a 4D array to a 2D array
+# # This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+# num_samples, img_height, img_width, num_channels = X_train.shape
+
+# # it flattens the image data, converting each image into a one-dimensional vector.
+# # The resulting shape is (num_samples, img_height * img_width * num_channels),
+# X_train = X_train.reshape(num_samples, -1)
+# num_samples, img_height, img_width, num_channels = X_test.shape
+# X_test = X_test.reshape(num_samples, -1)
+
+#%%
+
+# Select two classes (e.g., 'airplane' and 'automobile')
+class1, class2 = 0, 1  # You can choose the class indices based on the CIFAR-10 class names
+
+# Filter training data and labels for the selected classes
+selected_train_indices = np.where((y_train == class1) | (y_train == class2))[0]
+X_train_selected = X_train[selected_train_indices]
+y_train_selected = y_train[selected_train_indices]
+
+# Filter test data and labels for the selected classes
+selected_test_indices = np.where((y_test == class1) | (y_test == class2))[0]
+X_test_selected = X_test[selected_test_indices]
+y_test_selected = y_test[selected_test_indices]
+
+# Print the shape of the filtered datasets
+print("Shape of filtered training data:", X_train_selected.shape)
+print("Shape of filtered training labels:", y_train_selected.shape)
+print("Shape of filtered test data:", X_test_selected.shape)
+print("Shape of filtered test labels:", y_test_selected.shape)
+
+# we want to reshape the image from a 4D array to a 2D array
+# This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+num_samples, img_height, img_width, num_channels = X_train_selected.shape
+
+# it flattens the image data, converting each image into a one-dimensional vector.
+# The resulting shape is (num_samples, img_height * img_width * num_channels),
+X_train_selected = X_train_selected.reshape(num_samples, -1)
+num_samples, img_height, img_width, num_channels = X_test_selected.shape
+X_test_selected = X_test_selected.reshape(num_samples, -1)
+
+#%% Sigmoid kernel 
+
+# instantiate classifier with sigmoid kernel and C=1.0
+sigmoid_svc=SVC(kernel='sigmoid', C=1.0) 
+
+
+# fit classifier to training set
+sigmoid_svc.fit(X_train_selected,y_train_selected)
+
+#%%
+# make predictions on test set
+y_pred=sigmoid_svc.predict(X_test_selected)
+
+
+# compute and print accuracy score
+print('Model accuracy score with sigmoid kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+
+#Model accuracy score with sigmoid kernel and C=1.0 : 0.6925
+
+#%% Polynomial kernel 
+
+# instantiate classifier with polynomial kernel and C=1.0
+poly_svc=SVC(kernel='poly', C=1.0) 
+# degree int, default=3 
+
+# fit classifier to training set
+poly_svc.fit(X_train_selected,y_train_selected)
+
+
+# make predictions on test set
+y_pred=poly_svc.predict(X_test_selected)
+
+
+# compute and print accuracy score
+print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+
+#Model accuracy score with polynomial kernel and C=1.0 : 0.9145
+
+#%% Confusion matrix 
+
+# visualize confusion matrix with seaborn heatmap
+cm = confusion_matrix(y_test_selected, y_pred)
+class_names_selected = ['airplane', 'automobile']
+
+    
+heatmap_1 = sns.heatmap(
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
+heatmap_1.set_title("confusion matrix for neural network TEST")
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+ # print(classification_report(batch_y, output_for_matrix))
+plt.show()
+
+#sns.heatmap(cm_matrix, annot=True, fmt='d', cmap='YlGnBu')
+
+#%%  Default hyperparameter means C=1.0, kernel=rbf and gamma=auto among other parameters.
+
+# instantiate classifier with default hyperparameters
+svc=SVC() 
+
+
+# fit classifier to training set
+svc.fit(X_train_selected,y_train_selected)
+
+# make predictions on test set
+y_pred=svc.predict(X_test_selected)
+
+
+# compute and print accuracy score
+print('Model accuracy score with default hyperparameters: {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+#Model accuracy score with default hyperparameters: 0.9040
+#%% cm 
+
+cm = confusion_matrix(y_test_selected, y_pred)
+class_names_selected = ['airplane', 'automobile']
+
+heatmap_1 = sns.heatmap(
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
+heatmap_1.set_title("confusion matrix for neural network TEST")
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+ # print(classification_report(batch_y, output_for_matrix))
+plt.show()
+
+#%% neptune stop 
+run.stop()
+
+
+
+#%%
+grid_search.fit(X_train_selected, y_train_selected)
 
 #%% best model 
 
