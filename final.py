@@ -263,7 +263,7 @@ class Optimizer_Adam:
 
 # Common loss class
 class Loss:
-
+    #maybe this could be removed
     def remember_trainable_layers(self, trainable_layers):
         self.trainable_layers = trainable_layers
 

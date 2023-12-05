@@ -29,6 +29,8 @@ from tensorflow.keras.datasets import cifar10  # to import our data
 
 import random
 
+
+
 #%% netpune 
 import neptune
 from neptune.version import version as neptune_client_version
@@ -730,6 +732,7 @@ X_train = X_train[keys]
 y_train = y_train[keys]
 
 
+
 # # we want to reshape the image from a 4D array to a 2D array
 # # This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
 # num_samples, img_height, img_width, num_channels = X_train.shape
@@ -754,6 +757,7 @@ y_train_selected = y_train[selected_train_indices]
 selected_test_indices = np.where((y_test == class1) | (y_test == class2))[0]
 X_test_selected = X_test[selected_test_indices]
 y_test_selected = y_test[selected_test_indices]
+
 
 # Print the shape of the filtered datasets
 print("Shape of filtered training data:", X_train_selected.shape)
@@ -855,6 +859,65 @@ plt.ylabel('Actual')
  # print(classification_report(batch_y, output_for_matrix))
 plt.show()
 
+#%% linear kernel 
+
+
+# instantiate classifier with polynomial kernel and C=1.0
+linear_svc=SVC(kernel='linear') 
+# degree int, default=3 
+
+# fit classifier to training set
+linear_svc.fit(X_train_selected,y_train_selected)
+
+
+# make predictions on test set
+y_pred=linear_svc.predict(X_test_selected)
+
+
+# compute and print accuracy score
+print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+
+#Model accuracy score with polynomial kernel and C=1.0 : 0.9145
+
+#%% batching instead of 2 cateogires 
+
+batch_size = 10000
+X_batch = X_train[:batch_size]
+y_batch = y_train[:batch_size]
+
+batch_size_test = 2000
+X_batch_test = X_test[:batch_size_test]
+y_batch_test = y_test[:batch_size_test]
+
+
+# we want to reshape the image from a 4D array to a 2D array
+# This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+num_samples, img_height, img_width, num_channels = X_batch.shape
+
+# it flattens the image data, converting each image into a one-dimensional vector.
+# The resulting shape is (num_samples, img_height * img_width * num_channels),
+X_batch = X_batch.reshape(num_samples, -1)
+num_samples, img_height, img_width, num_channels = X_batch_test.shape
+X_batch_test = X_batch_test.reshape(num_samples, -1)
+
+#%% Polynomial kernel for batch 
+
+# instantiate classifier with polynomial kernel and C=1.0
+poly_svc=SVC(kernel='poly', C=1.0) 
+# degree int, default=3 
+
+# fit classifier to training set
+poly_svc.fit(X_batch,y_batch)
+
+
+# make predictions on test set
+y_pred=poly_svc.predict(X_batch_test)
+
+
+# compute and print accuracy score
+print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_batch_test, y_pred)))
+
+#Model accuracy score with polynomial kernel and C=1.0 : 0.9145
 #%% neptune stop 
 run.stop()
 
@@ -884,3 +947,90 @@ print('\n\nEstimator that was chosen by the search :','\n\n', (grid_search.best_
 # calculate GridSearch CV score on test set
 
 print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_test, y_test)))
+
+#%% self made svm 
+
+class SVM_from_scratch : 
+    
+    def __init__(self , learning_rate = 0.001 , lambda_param = 0.01 , n_iters = 1000): 
+        self.learning_rate = learning_rate 
+        self.lambda_param = lambda_param
+        self.n_iters = n_iters
+        self.weights = None 
+        self.bias = None 
+        
+    def fit(self , X , y): 
+        n_samples , n_features = X.shape  
+        
+        y_ = np.where(y <= 0 , -1 , 1)
+        
+        #init weights 
+        self.weights = np.zeros(n_features) 
+        self.bias = 0  
+        
+        for _ in range(self.n_iters): 
+            for index , x_i in enumerate(X): 
+                condition = y_[index] * (np.dot(x_i , self.weights) - self.bias) >= 1 
+                
+                if condition: 
+                    
+                    self.weights -= self.learning_rate * (2 * self.lambda_param * self.weights) # a -> learning rate 
+                
+                else: 
+                    
+                    self.weights  -= self.learning_rate * (2 * self.lambda_param * self.weights - np.dot(x_i , y_[index]))
+                    self.bias -= self.learning_rate * y_[index] 
+                    
+                    
+    
+    def predict(self  , X): 
+        approx = np.dot(X , self.weights) - self.bias
+        
+        return np.sign(approx)
+        
+
+#%% prepare dataset for the self made svm 
+
+# Select two classes (e.g., 'airplane' and 'automobile')
+class1, class2 = 0, 1  # You can choose the class indices based on the CIFAR-10 class names
+
+# Filter training data and labels for the selected classes
+selected_train_indices = np.where((y_train == class1) | (y_train == class2))[0]
+X_train_selected = X_train[selected_train_indices]
+y_train_selected = y_train[selected_train_indices]
+
+# Filter test data and labels for the selected classes
+selected_test_indices = np.where((y_test == class1) | (y_test == class2))[0]
+X_test_selected = X_test[selected_test_indices]
+y_test_selected = y_test[selected_test_indices]
+
+# Convert class names to numeric labels in y_train_selected and y_test_selected
+y_train_selected_numeric = np.where(y_train_selected == class1, -1, 1)
+y_test_selected_numeric = np.where(y_test_selected == class1, -1, 1)
+
+# Print the shape of the filtered datasets
+print("Shape of filtered training data:", X_train_selected.shape)
+print("Shape of filtered training labels:", y_train_selected_numeric.shape)
+print("Shape of filtered test data:", X_test_selected.shape)
+print("Shape of filtered test labels:", y_test_selected_numeric.shape)
+
+# we want to reshape the image from a 4D array to a 2D array
+# This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+num_samples, img_height, img_width, num_channels = X_train_selected.shape
+
+# it flattens the image data, converting each image into a one-dimensional vector.
+# The resulting shape is (num_samples, img_height * img_width * num_channels),
+X_train_selected = X_train_selected.reshape(num_samples, -1)
+num_samples, img_height, img_width, num_channels = X_test_selected.shape
+X_test_selected = X_test_selected.reshape(num_samples, -1)
+
+#%% add the data to the self made svm 
+
+svm_self_made = SVM_from_scratch() 
+
+svm_self_made.fit(X_train_selected, y_train_selected_numeric)
+predictions = svm_self_made.predict(X_test_selected)
+
+
+# compute and print accuracy score
+print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected_numeric, predictions)))
