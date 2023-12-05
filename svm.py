@@ -919,7 +919,7 @@ print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format
 
 #Model accuracy score with polynomial kernel and C=1.0 : 0.9145
 #%% neptune stop 
-run.stop()
+#run.stop()
 
 
 
@@ -981,7 +981,9 @@ class SVM_from_scratch :
                     self.weights  -= self.learning_rate * (2 * self.lambda_param * self.weights - np.dot(x_i , y_[index]))
                     self.bias -= self.learning_rate * y_[index] 
                     
-                    
+            predicted = self.predict(X)
+            accuracy = accuracy_score(y, predicted) 
+            run["accuracy"].append(accuracy)
     
     def predict(self  , X): 
         approx = np.dot(X , self.weights) - self.bias
@@ -1026,11 +1028,27 @@ X_test_selected = X_test_selected.reshape(num_samples, -1)
 
 #%% add the data to the self made svm 
 
-svm_self_made = SVM_from_scratch() 
+# Define parameters
+learning_rate = 0.01 #Model accuracy score with 0.001 and 0.01 200 itrs kernel and C=1.0 : 0.7710
+lambda_param = 0.02 #Model accuracy score with polynomial kernel and C=1.0 : 0.8040
+n_iters = 200
+svm_self_made = SVM_from_scratch(learning_rate , lambda_param , n_iters) 
 
+
+  
 svm_self_made.fit(X_train_selected, y_train_selected_numeric)
 predictions = svm_self_made.predict(X_test_selected)
 
 
 # compute and print accuracy score
 print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected_numeric, predictions)))
+
+  
+# Log metrics
+accuracy = accuracy_score(y_test_selected_numeric, predictions)
+run["accuracy"].append(accuracy)
+
+#%%
+run.stop()
+
+
