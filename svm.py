@@ -610,21 +610,20 @@ svc=SVC()
 
 
 # declare parameters for hyperparameter tuning
-parameters = [ {'C':[1], 'kernel':['linear']},
-               {'C':[1 ], 'kernel':['rbf'], 'gamma':[0.1]},
-               {'C':[1], 'kernel':['poly'], 'degree': [2] ,'gamma':[0.01]} 
+parameters = [ {'C':[1, 10, 100, 1000], 'kernel':['linear']},
+               {'C':[1, 10, 100, 1000], 'kernel':['rbf'], 'gamma':[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
+               {'C':[1, 10, 100, 1000], 'kernel':['poly'], 'degree': [2,3,4] ,'gamma':[0.01,0.02,0.03,0.04,0.05]} 
               ]
 
 
 
- # , 0.5, 0.9
- # ,0.03,0.05
- # , 10, 100, 1000
+
 grid_search = GridSearchCV(estimator = svc,  
                            param_grid = parameters,
                            scoring = 'accuracy',
-                           cv = 2,
-                           verbose=1)
+                           cv = 5,
+                           verbose=0)
+
 
 #%% Run the grid search 
 
