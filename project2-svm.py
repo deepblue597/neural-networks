@@ -10,10 +10,9 @@ Created on Wed Nov 29 20:04:37 2023
 # For example, here's several helpful packages to load in 
 
 import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import matplotlib.pyplot as plt # for data visualization
 import seaborn as sns # for statistical data visualization
-from sklearn.preprocessing import StandardScaler
+
 
 # import SVC classifier
 from sklearn.svm import SVC
@@ -28,19 +27,26 @@ from sklearn.metrics import classification_report
 from tensorflow.keras.datasets import cifar10  # to import our data
 
 import random
-
-
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import time
 
 #%% netpune 
 import neptune
 #from neptune.version import version as neptune_client_version
 #project = neptune.init_project(project="jason-k/example-project-tensorflow-keras", api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==")
-
+#%%
 run = neptune.init_run(
     project="jason-k/svm-neural",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==",
 )  # your credentials
 
+#%% create neptune model 
+
+model_version = neptune.init_model_version(
+    model="SVMNEUR-SELFMADE",
+    project="jason-k/svm-neural",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==", # your credentials
+)
 #%% CIFAR 10 dataset 
 
 # Load CIFAR-10 dataset
@@ -131,16 +137,17 @@ X_test_selected = X_test_selected.reshape(num_samples, -1)
 # instantiate classifier with sigmoid kernel and C=1.0
 sigmoid_svc=SVC(kernel='sigmoid', C=1.0) 
 
-
+start_time = time.perf_counter()
 # fit classifier to training set
 sigmoid_svc.fit(X_train_selected,y_train_selected)
-
+end_time = time.perf_counter()
 # make predictions on test set
 y_pred=sigmoid_svc.predict(X_test_selected)
 
 
 # compute and print accuracy score
 print('Model accuracy score with sigmoid kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+print(classification_report(y_test_selected, y_pred))
 
 #Model accuracy score with sigmoid kernel and C=1.0 : 0.6925
 
@@ -151,22 +158,23 @@ class_names_selected = ['airplane', 'automobile']
     
 heatmap_1 = sns.heatmap(
      cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
-heatmap_1.set_title("confusion matrix for neural network TEST")
+heatmap_1.set_title("confusion matrix for sigmoid kernel")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
  # print(classification_report(batch_y, output_for_matrix))
 plt.show()
 
-
+print(end_time-start_time)
 #%% Polynomial kernel 
 
 # instantiate classifier with polynomial kernel and C=1.0
 poly_svc=SVC(kernel='poly', C=1.0) 
 # degree int, default=3 
 
+start_time = time.perf_counter()
 # fit classifier to training set
 poly_svc.fit(X_train_selected,y_train_selected)
-
+end_time = time.perf_counter()
 
 # make predictions on test set
 y_pred=poly_svc.predict(X_test_selected)
@@ -174,9 +182,10 @@ y_pred=poly_svc.predict(X_test_selected)
 
 # compute and print accuracy score
 print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
-
+print(classification_report(y_test_selected, y_pred))
 #Model accuracy score with polynomial kernel and C=1.0 : 0.9145
 
+print(end_time-start_time)
 #%% Confusion matrix 
 
 # visualize confusion matrix with seaborn heatmap
@@ -186,7 +195,7 @@ class_names_selected = ['airplane', 'automobile']
     
 heatmap_1 = sns.heatmap(
      cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
-heatmap_1.set_title("confusion matrix for neural network TEST")
+heatmap_1.set_title("confusion matrix for polynomial kernel")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
  # print(classification_report(batch_y, output_for_matrix))
@@ -199,9 +208,10 @@ plt.show()
 # instantiate classifier with default hyperparameters
 svc=SVC() 
 
-
+start_time = time.perf_counter()
 # fit classifier to training set
 svc.fit(X_train_selected,y_train_selected)
+end_time = time.perf_counter()
 
 # make predictions on test set
 y_pred=svc.predict(X_test_selected)
@@ -209,14 +219,17 @@ y_pred=svc.predict(X_test_selected)
 
 # compute and print accuracy score
 print('Model accuracy score with default hyperparameters: {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+print(classification_report(y_test_selected, y_pred))
 #Model accuracy score with default hyperparameters: 0.9040
+print(end_time-start_time)
 
+#%%
 cm = confusion_matrix(y_test_selected, y_pred)
 class_names_selected = ['airplane', 'automobile']
 
 heatmap_1 = sns.heatmap(
      cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
-heatmap_1.set_title("confusion matrix for neural network TEST")
+heatmap_1.set_title("confusion matrix for rbf kernel")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
  # print(classification_report(batch_y, output_for_matrix))
@@ -228,26 +241,27 @@ plt.show()
 # instantiate classifier with polynomial kernel and C=1.0
 linear_svc=SVC(kernel='linear') 
 # degree int, default=3 
-
+start_time = time.perf_counter()
 # fit classifier to training set
 linear_svc.fit(X_train_selected,y_train_selected)
-
+end_time = time.perf_counter()
 
 # make predictions on test set
 y_pred=linear_svc.predict(X_test_selected)
 
 
 # compute and print accuracy score
-print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
-
-#Model accuracy score with polynomial kernel and C=1.0 : 0.9145
+print('Model accuracy score with linear kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected, y_pred)))
+print(classification_report(y_test_selected, y_pred))
+#Model accuracy score with linear kernel and C=1.0: 0.8000
+print(end_time-start_time)
 
 cm = confusion_matrix(y_test_selected, y_pred)
 class_names_selected = ['airplane', 'automobile']
 
 heatmap_1 = sns.heatmap(
      cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
-heatmap_1.set_title("confusion matrix for neural network TEST")
+heatmap_1.set_title("confusion matrix for linear kernel")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
  # print(classification_report(batch_y, output_for_matrix))
@@ -292,11 +306,12 @@ y_pred=poly_svc.predict(X_batch_test)
 
 # compute and print accuracy score
 print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_batch_test, y_pred)))
-
+print(classification_report(y_batch_test, y_pred))
 #Model accuracy score with polynomial kernel and C=1.0 : 0.9145
 
-cm = confusion_matrix(y_test_selected, y_pred)
-class_names_selected = ['airplane', 'automobile']
+cm = confusion_matrix(y_batch_test, y_pred)
+class_names_selected = ['airplane', 'automobile', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 heatmap_1 = sns.heatmap(
      cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
@@ -322,16 +337,16 @@ svc=SVC()
 
 
 # declare parameters for hyperparameter tuning
-parameters = [ {'C':[1, 10], 'kernel':['linear']},
-               {'C':[1, 10], 'kernel':['rbf'], 'gamma':[0.1, 0.5, 0.9]},
-               {'C':[1, 10], 'kernel':['poly'], 'degree': [2,3,4] ,'gamma':[0.01,0.05]} 
+parameters = [ {'C':[1, 10], 'kernel':['linear']}
               ]
 
 
-#, 100, 1000
-#, 100, 1000  0.2, 0.3, 0.4,  0.6, 0.7, 0.8,
-#, 100, 1000  0.02,0.03,0.04,
-
+# =============================================================================
+# ,
+#                {'C':[1, 10, 100, 1000], 'kernel':['rbf'], 'gamma':[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
+#                {'C':[1, 10, 100, 1000], 'kernel':['poly'], 'degree': [2,3,4] ,'gamma':[0.01,0.02,0.03,0.04,0.05]} 
+# 
+# =============================================================================
 grid_search = GridSearchCV(estimator = svc,  
                            param_grid = parameters,
                            scoring = 'accuracy',
@@ -339,7 +354,7 @@ grid_search = GridSearchCV(estimator = svc,
                            verbose=0)
 
 #%% fit the data
-grid_search.fit(X_batch, y_batch)
+grid_search.fit(X_train_selected, y_train_selected)
 
 #%% best model 
 
@@ -357,21 +372,30 @@ print('Parameters that give the best results :','\n\n', (grid_search.best_params
 # print estimator that was chosen by the GridSearch
 print('\n\nEstimator that was chosen by the search :','\n\n', (grid_search.best_estimator_))
 
+#%% 
+print(grid_search.cv_results_)
+print(grid_search.refit_time_)
+results = grid_search.cv_results_
+
+
 #%% test data in gridsearch
 # calculate GridSearch CV score on test set
 
-print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_batch_test, y_batch_test)))
+print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_test_selected , y_test_selected)))
 
 #%% self made svm 
 
 class SVM_from_scratch : 
     
-    def __init__(self , learning_rate = 0.001 , lambda_param = 0.01 , n_iters = 1000): 
+    def __init__(self , learning_rate = 0.001 , lambda_param = 0.01 , n_iters = 1000 ): 
         self.learning_rate = learning_rate 
         self.lambda_param = lambda_param
         self.n_iters = n_iters
         self.weights = None 
         self.bias = None 
+        self.iteration = iteration
+        #run[self.iteration]['params/learning_rate'] = learning_rate
+        #run[self.iteration]['params/lambda_param'] = lambda_param
         
     def fit(self , X , y): 
         n_samples , n_features = X.shape  
@@ -397,7 +421,8 @@ class SVM_from_scratch :
                     
             predicted = self.predict(X)
             accuracy = accuracy_score(y, predicted) 
-            run["accuracy"].append(accuracy)
+            #model_version["accuracy"] = accuracy
+            #run[self.iteration]["params/accuracy"].append(accuracy)
     
     def predict(self  , X): 
         approx = np.dot(X , self.weights) - self.bias
@@ -406,6 +431,19 @@ class SVM_from_scratch :
         
 
 #%% prepare dataset for the self made svm 
+
+class1, class2 = 0, 1  # You can choose the class indices based on the CIFAR-10 class names
+
+# Filter training data and labels for the selected classes
+selected_train_indices = np.where((y_train == class1) | (y_train == class2))[0]
+X_train_selected = X_train[selected_train_indices]
+y_train_selected = y_train[selected_train_indices]
+
+# Filter test data and labels for the selected classes
+selected_test_indices = np.where((y_test == class1) | (y_test == class2))[0]
+X_test_selected = X_test[selected_test_indices]
+y_test_selected = y_test[selected_test_indices]
+
 
 # Convert class names to numeric labels in y_train_selected and y_test_selected
 y_train_selected_numeric = np.where(y_train_selected == class1, -1, 1)
@@ -430,24 +468,95 @@ X_test_selected = X_test_selected.reshape(num_samples, -1)
 #%% add the data to the self made svm 
 
 # Define parameters
-learning_rate = 0.01 #Model accuracy score with 0.001 and 0.01 200 itrs kernel and C=1.0 : 0.7710
+learning_rate = 0.01 #Model accuracy score with 0.001 and 0.01 200 itrs ker: 0.7710
 lambda_param = 0.02 #Model accuracy score with polynomial kernel and C=1.0 : 0.8040
 n_iters = 200
 svm_self_made = SVM_from_scratch(learning_rate , lambda_param , n_iters) 
 
 
-  
+start_time = time.perf_counter()
 svm_self_made.fit(X_train_selected, y_train_selected_numeric)
+end_time = time.perf_counter()
+
+
 predictions = svm_self_made.predict(X_test_selected)
 
 
 # compute and print accuracy score
-print('Model accuracy score with polynomial kernel and C=1.0 : {0:0.4f}'. format(accuracy_score(y_test_selected_numeric, predictions)))
-
-  
+print('Model accuracy score: {0:0.4f}'. format(accuracy_score(y_test_selected_numeric, predictions)))
+print(classification_report(y_test_selected_numeric, predictions))
+print(end_time-start_time)
 # Log metrics
 accuracy = accuracy_score(y_test_selected_numeric, predictions)
-run["accuracy"].append(accuracy)
+#run["accuracy"].append(accuracy)
+#model_version["accuracy"] = accuracy
+
+#%% 
+
+cm = confusion_matrix(y_test_selected_numeric, predictions)
+class_names_selected = ['airplane', 'automobile']
+
+heatmap_1 = sns.heatmap(
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
+heatmap_1.set_title("confusion matrix for SVM from scratch")
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+
+plt.show()
+#%% 
+n_iters = 300
+param_grid = {
+    'lambda_param': [0.01, 0.1, 1, 10, 100],
+    'learning_rate': [0.1, 0.01, 0.001]
+}
+run = []  
+iteration = 0  
+
+for lambda_param in param_grid['lambda_param']:
+    for learning_rate in param_grid['learning_rate']:
+        
+        run.append(neptune.init_run(
+            project="jason-k/svm-neural",
+            name="logging-to-multipe-runs",
+            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZTI4NWM4OC0wMDg2LTQ2YTItYmFmMi1iZGQ3MmZhN2U5MDkifQ==",
+        ))  # your credentials
+
+        svm_self_made = SVM_from_scratch(learning_rate=learning_rate, lambda_param=lambda_param , n_iters= n_iters , iteration = iteration)
+        # Train the model and evaluate performance
+        # Record the performance metrics for this combination
+        
+        start_time = time.perf_counter()
+        svm_self_made.fit(X_train_selected, y_train_selected_numeric)
+        end_time = time.perf_counter()
+        
+        
+        predictions = svm_self_made.predict(X_test_selected)
+        
+        
+        # compute and print accuracy score
+        print('Model accuracy score for learning rate:', learning_rate ,'and lamda param P:', lambda_param ,'is ={0:0.4f}'. format(accuracy_score(y_test_selected_numeric, predictions)))
+        print(classification_report(y_test_selected_numeric, predictions))
+        print(end_time-start_time)
+        # Log metrics
+        accuracy = accuracy_score(y_test_selected_numeric, predictions)
+        run[iteration]["params/accuracy"].append(accuracy)
+        #model_version["accuracy"] = accuracy
+        
+            
+        
+        cm = confusion_matrix(y_test_selected_numeric, predictions)
+        class_names_selected = ['airplane', 'automobile']
+        
+        heatmap_1 = sns.heatmap(
+             cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
+        heatmap_1.set_title("confusion matrix for SVM from scratch with {lambda_param} and {learning_rate}")
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        
+        plt.show()
+        
+        run[iteration].stop()
+        iteration += 1 
 
 #%% stop neptune 
-run.stop()
+run[12].stop()
