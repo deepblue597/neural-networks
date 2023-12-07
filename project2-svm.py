@@ -294,13 +294,15 @@ X_batch_test = X_batch_test.reshape(num_samples, -1)
 
 # instantiate classifier with polynomial kernel and C=1.0
 poly_svc=SVC(kernel='poly', C=1.0) 
-# degree int, default=3 
-
+# degree int, default=3
+ 
+start_time = time.perf_counter()
 # fit classifier to training set
 poly_svc.fit(X_batch,y_batch)
-
+end_time = time.perf_counter()
 
 # make predictions on test set
+
 y_pred=poly_svc.predict(X_batch_test)
 
 
@@ -337,7 +339,9 @@ svc=SVC()
 
 
 # declare parameters for hyperparameter tuning
-parameters = [ {'C':[1, 10], 'kernel':['linear']}
+parameters = [ {'C':[1, 10], 'kernel':['linear']},
+              {'C':[1, 10], 'kernel':['rbf'], 'gamma':[0.1, 0.5, 0.9]},
+              {'C':[1, 10], 'kernel':['poly'], 'degree': [2,4] ,'gamma':[0.01, 0.05]}
               ]
 
 
