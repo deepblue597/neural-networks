@@ -22,6 +22,9 @@ from sklearn.neighbors import NearestCentroid  # kmeans clustering
 from tensorflow.keras.datasets import cifar10  # to import our data
 from tensorflow import keras
 import random
+import numpy as np 
+import time
+
 
 # Load CIFAR-10 dataset
 (X_train, y_train), (X_test, y_test) = cifar10.load_data()
@@ -73,6 +76,58 @@ X_train = X_train.reshape(num_samples, -1)
 num_samples, img_height, img_width, num_channels = X_test.shape
 X_test = X_test.reshape(num_samples, -1)
 
+#%% Batching for SVM 
+
+batch_size = 10000
+X_batch = X_train[:batch_size]
+y_batch = y_train[:batch_size]
+
+batch_size_test = 2000
+X_batch_test = X_test[:batch_size_test]
+y_batch_test = y_test[:batch_size_test]
+
+
+# we want to reshape the image from a 4D array to a 2D array
+# This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+num_samples, img_height, img_width, num_channels = X_batch.shape
+
+# it flattens the image data, converting each image into a one-dimensional vector.
+# The resulting shape is (num_samples, img_height * img_width * num_channels),
+X_batch = X_batch.reshape(num_samples, -1)
+num_samples, img_height, img_width, num_channels = X_batch_test.shape
+X_batch_test = X_batch_test.reshape(num_samples, -1)
+
+#%%  Select two classes (e.g., 'airplane' and 'automobile') for SVM 
+
+class1, class2 = 0, 1  # You can choose the class indices based on the CIFAR-10 class names
+
+# Filter training data and labels for the selected classes
+selected_train_indices = np.where((y_train == class1) | (y_train == class2))[0]
+X_train_selected = X_train[selected_train_indices]
+y_train_selected = y_train[selected_train_indices]
+
+# Filter test data and labels for the selected classes
+selected_test_indices = np.where((y_test == class1) | (y_test == class2))[0]
+X_test_selected = X_test[selected_test_indices]
+y_test_selected = y_test[selected_test_indices]
+
+
+# Print the shape of the filtered datasets
+print("Shape of filtered training data:", X_train_selected.shape)
+print("Shape of filtered training labels:", y_train_selected.shape)
+print("Shape of filtered test data:", X_test_selected.shape)
+print("Shape of filtered test labels:", y_test_selected.shape)
+
+# we want to reshape the image from a 4D array to a 2D array
+# This line extracts the number of samples, image height, image width, and number of channels (e.g., RGB channels) from the shape of the X_train array.
+num_samples, img_height, img_width, num_channels = X_train_selected.shape
+
+# it flattens the image data, converting each image into a one-dimensional vector.
+# The resulting shape is (num_samples, img_height * img_width * num_channels),
+X_train_selected = X_train_selected.reshape(num_samples, -1)
+num_samples, img_height, img_width, num_channels = X_test_selected.shape
+X_test_selected = X_test_selected.reshape(num_samples, -1)
+
 # %%
 
 # instantiate the model
@@ -80,40 +135,45 @@ knn_3 = KNeighborsClassifier(n_neighbors=3)  # 3 neighboors
 
 knn_1 = KNeighborsClassifier(n_neighbors=1)  # 1 neighboors
 
+start_time_3 = time.perf_counter()
 # fit the model to the training set
-knn_3.fit(X_train, y_train)
-
-knn_1.fit(X_train, y_train)
-
+knn_3.fit(X_train_selected, y_train_selected)
+end_time_3 = time.perf_counter()
+start_time_1 = time.perf_counter()
+knn_1.fit(X_train_selected, y_train_selected)
+end_time_1 = time.perf_counter()
 # Predict the variable from the X_test
-y_pred_3 = knn_3.predict(X_test)
+y_pred_3 = knn_3.predict(X_test_selected)
 
-y_pred_1 = knn_1.predict(X_test)
+y_pred_1 = knn_1.predict(X_test_selected)
 
 print("3 neighboors pred\n", y_pred_3)
 
 print("1 neighboor pred\n", y_pred_1)
+
+print('3 time:' , end_time_3-start_time_3)
+print('1 time:' , end_time_1-start_time_1)
 
 # %%
 
 # We check the accuracy of our score by copmaring the test values (correct one) with the predicted values
 
 print('Model accuracy score for 1 neighboor: {0:0.4f}'. format(
-    accuracy_score(y_test, y_pred_1)))
+    accuracy_score(y_test_selected, y_pred_1)))
 print('Model accuracy score for 3 neighboors: {0:0.4f}'. format(
-    accuracy_score(y_test, y_pred_3)))
+    accuracy_score(y_test_selected, y_pred_3)))
 
 # %%
 
-y_pred_train_1 = knn_1.predict(X_train)
-y_pred_train_3 = knn_3.predict(X_train)
+y_pred_train_1 = knn_1.predict(X_train_selected)
+y_pred_train_3 = knn_3.predict(X_train_selected)
 
 # %%
 # we do the same with the training set to see the overall accuracy
 print('Training-set accuracy score for 1 neighboor: {0:0.4f}'. format(
-    accuracy_score(y_train, y_pred_train_1)))
+    accuracy_score(y_train_selected, y_pred_train_1)))
 print('Training-set accuracy score for 3 neighboors: {0:0.4f}'. format(
-    accuracy_score(y_train, y_pred_train_3)))
+    accuracy_score(y_train_selected, y_pred_train_3)))
 
 # %%
 # check null accuracy score
@@ -125,26 +185,27 @@ print('Null accuracy score: {0:0.4f}'. format(null_accuracy))
 
 # %%
 
+class_names_selected = ['airplane', 'automobile']
 # Create the  confusion matrixes
-cm_1 = confusion_matrix(y_test, y_pred_1)
+cm_1 = confusion_matrix(y_test_selected, y_pred_1)
 heatmap_1 = sns.heatmap(cm_1, annot=True, fmt='d', cmap='YlGnBu',
-                        xticklabels=class_names, yticklabels=class_names)
+                        xticklabels=class_names_selected, yticklabels=class_names_selected)
 heatmap_1.set_title("confusion matrix for 1 neighboor")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
-print(classification_report(y_test, y_pred_1))
+print(classification_report(y_test_selected, y_pred_1))
 plt.show()
 
-cm_3 = confusion_matrix(y_test, y_pred_3)
+cm_3 = confusion_matrix(y_test_selected, y_pred_3)
 
 heatmap_3 = sns.heatmap(cm_3, annot=True, fmt='d', cmap='YlGnBu',
-                        xticklabels=class_names, yticklabels=class_names)
+                        xticklabels=class_names_selected, yticklabels=class_names_selected)
 heatmap_3.set_title("confusion matrix for 3 neighboors")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
 plt.show()
 
-print(classification_report(y_test, y_pred_3))
+print(classification_report(y_test_selected, y_pred_3))
 
 # =============================================================================
 # Precision
@@ -178,7 +239,7 @@ print(classification_report(y_test, y_pred_3))
 # instead of taking a test data and a training data, we use multiple test and train
 # to check how the score changes with different data
 
-scores = cross_val_score(knn_1, X_train, y_train, cv=10, scoring='accuracy')
+scores = cross_val_score(knn_1, X_train_selected, y_train_selected, cv=10, scoring='accuracy')
 
 print('Cross-validation scores with 1nn:{}'.format(scores))
 
@@ -187,7 +248,7 @@ print('Cross-validation scores with 1nn:{}'.format(scores))
 
 print('Average cross-validation score with 1nn: {:.4f}'.format(scores.mean()))
 
-scores_3 = cross_val_score(knn_3, X_train, y_train, cv=10, scoring='accuracy')
+scores_3 = cross_val_score(knn_3, X_train_selected, y_train_selected, cv=10, scoring='accuracy')
 
 print('Cross-validation scores with 3nn:{}'.format(scores_3))
 
@@ -203,41 +264,45 @@ print(
 
 
 centroid_classifier = NearestCentroid()
-centroid_classifier.fit(X_train, y_train)
+start_time_cen = time.perf_counter()
+centroid_classifier.fit(X_train_selected, y_train_selected)
+end_time_cen = time.perf_counter()
 
-y_pred_centroid = centroid_classifier.predict(X_test)
+print('elapsed time', end_time_cen-start_time_cen)
+#%%
+y_pred_centroid = centroid_classifier.predict(X_test_selected)
 
 print("centroid classifier pred\n", y_pred_centroid)
 
 print('Model accuracy score for centroid classifier: {0:0.4f}'. format(
-    accuracy_score(y_test, y_pred_centroid)))
+    accuracy_score(y_test_selected, y_pred_centroid)))
 
-y_pred_train_centroid = centroid_classifier.predict(X_train)
+y_pred_train_centroid = centroid_classifier.predict(X_train_selected)
 
 print('Training-set accuracy score for centroid classifier: {0:0.4f}'. format(
-    accuracy_score(y_train, y_pred_train_centroid)))
+    accuracy_score(y_train_selected, y_pred_train_centroid)))
 
 # %%
 
-cm_centroid = confusion_matrix(y_test, y_pred_centroid)
+cm_centroid = confusion_matrix(y_test_selected, y_pred_centroid)
 
 heatmap_cent = sns.heatmap(cm_centroid, annot=True, fmt='d',
-                           cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
+                           cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
 heatmap_cent.set_title("confusion matrix for centroid")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
 plt.show()
 
-print(classification_report(y_test, y_pred_centroid))
+print(classification_report(y_test_selected, y_pred_centroid))
 
 # %%
-scores_centroid = cross_val_score(centroid_classifier, X_train, y_train, cv=10)
+scores_centroid = cross_val_score(centroid_classifier, X_train_selected, y_train_selected, cv=10)
 
 # Print the cross-validation scores
 
 print("Cross-Validation Scores:", scores_centroid)
 print(
-    'Average cross-validation score with 1nn: {:.4f}'.format(scores_centroid.mean()))
+    'Average cross-validation score with centroid: {:.4f}'.format(scores_centroid.mean()))
 
 # %%
 # ----------------------- Results ----------------------------

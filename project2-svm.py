@@ -302,7 +302,8 @@ poly_svc.fit(X_batch,y_batch)
 end_time = time.perf_counter()
 
 # make predictions on test set
-
+print(end_time-start_time)
+#%%
 y_pred=poly_svc.predict(X_batch_test)
 
 
@@ -358,9 +359,9 @@ grid_search = GridSearchCV(estimator = svc,
                            verbose=0)
 
 #%% fit the data
-grid_search.fit(X_train_selected, y_train_selected)
+grid_search.fit(X_batch, y_batch)
 
-#%% best model 
+
 
 # examine the best model
 
@@ -376,16 +377,16 @@ print('Parameters that give the best results :','\n\n', (grid_search.best_params
 # print estimator that was chosen by the GridSearch
 print('\n\nEstimator that was chosen by the search :','\n\n', (grid_search.best_estimator_))
 
-#%% 
+
 print(grid_search.cv_results_)
 print(grid_search.refit_time_)
 results = grid_search.cv_results_
 
 
-#%% test data in gridsearch
+#test data in gridsearch
 # calculate GridSearch CV score on test set
 
-print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_test_selected , y_test_selected)))
+print('GridSearch CV score on test set: {0:0.4f}'.format(grid_search.score(X_batch_test , y_batch_test)))
 
 #%% self made svm 
 
