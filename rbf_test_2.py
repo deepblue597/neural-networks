@@ -118,7 +118,7 @@ def K_means_centers(X , max_iters , n_centers):
     print('hey')
     return km.cluster_centers_
 
-rbf_width = 8.0
+rbf_width = 10.0
 
 def rbf_layer(X, rbf_centers, rbf_width):
     return gaussian_rbf(X, rbf_centers, rbf_width)
@@ -129,9 +129,9 @@ def rbfn_predict(X, rbf_centers, rbf_width, weights):
 
 
 #%% 
-rbf_centers = random_centers(n_centers=1000 , X_train = X_train )
+rbf_centers = random_centers(n_centers=500 , X_train = X_train )
 
-centers = [ 10 , 50 , 100 , 200 , 500 , 1000 ]
+centers = [ 10 , 50 , 100 , 200 , 500]
 
 #k_centers = K_means_centers(X = X_batch , max_iters = 300 , n_centers = 100)
 print('hi')
