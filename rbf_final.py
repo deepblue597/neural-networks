@@ -9,10 +9,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression
-from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from mlxtend.plotting import plot_decision_regions 
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
@@ -108,7 +105,6 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
 
         input_dim = rbf_outputs_train.shape[1]
         output_dim = len(np.unique(y_train))
-
         model = nn.Linear(input_dim, output_dim)
         criterion = nn.CrossEntropyLoss()
         if optimizer == 'adam': 
