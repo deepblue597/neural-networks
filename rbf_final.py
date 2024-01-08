@@ -19,6 +19,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 import time
+from sklearn.decomposition import PCA
 
 #%% Gaussin class 
 
@@ -43,6 +44,23 @@ class CentersInitializer:
         km = KMeans(n_clusters=n_centers, max_iter=max_iters, verbose=0)
         km.fit(X)
         return km.cluster_centers_
+    
+    def k_means_centers_per_class(self, X_train, y_train, max_iters, n_centers):
+        unique_classes = np.unique(y_train)
+        class_centers = {}
+    
+        for class_label in unique_classes:
+            # Extract data for the current class
+            class_data = X_train[y_train == class_label]
+    
+            # Apply k-means
+            km = KMeans(n_clusters=n_centers, max_iter=max_iters, verbose=0)
+            km.fit(class_data)
+    
+            # Save cluster centers
+            class_centers[class_label] = km.cluster_centers_
+    
+        return class_centers
 
 
 class RBFNeuralNetwork(GaussianRBF, CentersInitializer):
@@ -102,6 +120,10 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
         elif center_initializer == 'k_means':
             self.rbf_centers = torch.tensor(self.k_means_centers(X_train, max_iters=300, n_centers=self.n_centers),
                                             dtype=torch.float32, device=device)
+        elif center_initializer == 'k_means_per_class':
+          class_centers = self.k_means_centers_per_class(X_train, y_train, max_iters=300, n_centers=self.n_centers)
+          # Use the class centers as the RBF centers
+          self.rbf_centers = torch.tensor(np.concatenate(list(class_centers.values())), dtype=torch.float32, device=device)
 
         rbf_outputs_train = self.gaussian_rbf(torch.tensor(X_train, dtype=torch.float32, device=device),
                                               self.rbf_centers, self.rbf_width)
@@ -119,7 +141,7 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
         y_train_tensor = torch.tensor(y_train, dtype=torch.long, device=device)
 
         dataset = TensorDataset(X_train_tensor, y_train_tensor)
-        dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=128 , shuffle=True) #, batch_size=128
 
         for epoch in range(epochs):
             for inputs, labels in dataloader:
@@ -138,6 +160,9 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
                     y_pred = torch.argmax(logits_test, dim=1).cpu().numpy()
                     accuracy = accuracy_score(y_train, y_pred)
                     print(f"Epoch {epoch}, Accuracy: {accuracy * 100:.2f}%")
+                    # Calculate and print the loss
+                    loss_value = criterion(logits_test, torch.tensor(y_train, dtype=torch.long, device=device)).item()
+                    print(f"Epoch {epoch}, Loss: {loss_value:.4f}")
                     cm = confusion_matrix(y_train, y_pred)
                     class_names = ['airplane', 'automobile', 'bird', 'cat',
                                    'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -206,6 +231,8 @@ np.random.shuffle(keys)
 X_train = X_train[keys]
 y_train = y_train[keys]
 
+
+
 #%% reshape the data 
 
 # we want to reshape the image from a 4D array to a 2D array
@@ -217,7 +244,40 @@ num_samples, img_height, img_width, num_channels = X_train.shape
 X_train = X_train.reshape(num_samples, -1)
 num_samples, img_height, img_width, num_channels = X_test.shape
 X_test = X_test.reshape(num_samples, -1)
+
+#%% pca 
+
+# Initialize PCA
+pca = PCA()
+
+# Fit on training data
+pca.fit(X_train)
+
+# Plot the cumulative explained variance ratio
+plt.plot(range(1, len(pca.explained_variance_ratio_) + 1), np.cumsum(pca.explained_variance_ratio_))
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Explained Variance')
+plt.title('Explained Variance vs. Number of Components')
+plt.show()
  
+#%% apply pca
+
+# Apply PCA
+num_components = 500  # You can choose the number of components based on your experimentation
+pca = PCA(n_components=num_components)
+X_train_pca = pca.fit_transform(X_train)
+X_test_pca = pca.transform(X_test)
+
+#%% restore to original shape ( if needed ) 
+
+# Reshape back to the original format
+X_train = X_train_pca.reshape(num_samples, img_height, img_width, num_channels)
+X_test = X_test_pca.reshape(num_samples, img_height, img_width, num_channels)
+#%% variance ratio 
+
+
+print("Explained Variance Ratio:", pca.explained_variance_ratio_)
+print("Total Explained Variance:", np.sum(pca.explained_variance_ratio_))
 
 #%% batching instead of 2 cateogires 
 
@@ -229,19 +289,23 @@ batch_size_test = 2000
 X_batch_test = X_test[:batch_size_test]
 y_batch_test = y_test[:batch_size_test]
 
+#%% 
+print(X_train_pca.shape)
+print(X_train.shape)
+print(X_test_pca.shape)
 #%% custom made rbf nn 
 
 centers = [10 , 50 , 100 , 200 , 500]
 variance = [ 0.5 , 1 , 5 , 8 , 10 , 20 ]
 
-rbf_nn = RBFNeuralNetwork(n_centers=100, rbf_width=10)
+rbf_nn = RBFNeuralNetwork(n_centers=500, rbf_width=10)
 
 start_time = time.perf_counter()
-rbf_nn.fit(X_train, y_train, center_initializer='k_means')
+rbf_nn.fit(X_train_pca, y_train, center_initializer='k_means')
 end_time = time.perf_counter()
 
 # confusion matrix for train data 
-y_pred_train = rbf_nn.predict(X_train)
+y_pred_train = rbf_nn.predict(X_train_pca)
 cm = confusion_matrix(y_train, y_pred_train)
 class_names = ['airplane', 'automobile', 'bird', 'cat',
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -259,7 +323,8 @@ plt.show()
 accuracy = accuracy_score(y_train, y_pred_train) 
 print(f"Accuracy: {accuracy * 100:.2f}%")
 
-y_pred = rbf_nn.predict(X_test)
+
+y_pred = rbf_nn.predict(X_test_pca)
 
 cm = confusion_matrix(y_test, y_pred)
 class_names = ['airplane', 'automobile', 'bird', 'cat',
@@ -285,16 +350,17 @@ print(classification_report(y_test, y_pred))
 
 #%% pytorch
 
-rbf_nn_tensor = RBFNeuralNetwork_torch(n_centers=500, rbf_width=10.0)
+rbf_nn_tensor = RBFNeuralNetwork_torch(n_centers=500, rbf_width=2.0) # sigma = 2.0 sigma 
 start_time = time.perf_counter()
-rbf_nn_tensor.fit(X_train, y_train, center_initializer='random', lr=0.005, epochs=150 , optimizer='adam')
-end_time = time.perf_counter() 
+rbf_nn_tensor.fit(X_train_pca, y_train, center_initializer='k_means_per_class', lr=0.008, epochs=150 , optimizer='adam' , weight_decay = 1e-6)
+end_time = time.perf_counter() #lr 0.01 weight = 1e-3 really good , lr = 0.01 weight = 1e-2 not good, lr= 0.05 weight 1e-3 really good 38.15%
+                                # lt 0.005 weight 1e-4 39.23% k_means_per_class  lt 0.005 weight 1e-5 43% k_means_per_class lt 0.008 weight 1e-6 45.29% k_means_per_class
 
-#%% predictions
+# predictions
 
 
 # Make predictions on test set
-y_pred = rbf_nn_tensor.predict(X_test)
+y_pred = rbf_nn_tensor.predict(X_test_pca)
 
 # Evaluate the model
 accuracy = accuracy_score(y_test, y_pred) 
