@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
+import time
 
 #%% Gaussin class 
 
@@ -64,6 +65,8 @@ class RBFNeuralNetwork(GaussianRBF, CentersInitializer):
         # Train logistic regression model
         self.logistic_regression = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=1000)
         self.logistic_regression.fit(rbf_outputs_train, y_train)
+        
+        
 
     def predict(self, X_test):
         # Calculate RBF layer outputs for test data
@@ -127,7 +130,7 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
                 loss.backward()
                 optimizer.step()
 
-            if epoch % 10 == 0:
+            if epoch % 10 == 0 or epoch == (epochs - 1) :
                 with torch.no_grad():
                     rbf_outputs_test = self.gaussian_rbf(torch.tensor(X_train, dtype=torch.float32, device=device),
                                                          self.rbf_centers, self.rbf_width)
@@ -135,6 +138,19 @@ class RBFNeuralNetwork_torch(GaussianRBF_torch, CentersInitializer):
                     y_pred = torch.argmax(logits_test, dim=1).cpu().numpy()
                     accuracy = accuracy_score(y_train, y_pred)
                     print(f"Epoch {epoch}, Accuracy: {accuracy * 100:.2f}%")
+                    cm = confusion_matrix(y_train, y_pred)
+                    class_names = ['airplane', 'automobile', 'bird', 'cat',
+                                   'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+                        
+                    heatmap_1 = sns.heatmap(
+                         cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
+                    heatmap_1.set_title("confusion matrix")
+                    plt.xlabel('Predicted')
+                    plt.ylabel('Actual')
+                     # print(classification_report(batch_y, output_for_matrix))
+                    plt.show()
+
 
         self.logistic_regression = model
 
@@ -218,34 +234,82 @@ y_batch_test = y_test[:batch_size_test]
 centers = [10 , 50 , 100 , 200 , 500]
 variance = [ 0.5 , 1 , 5 , 8 , 10 , 20 ]
 
-rbf_nn = RBFNeuralNetwork(n_centers=500, rbf_width=10.0)
-rbf_nn.fit(X_train, y_train, center_initializer='random')
+rbf_nn = RBFNeuralNetwork(n_centers=100, rbf_width=10)
+
+start_time = time.perf_counter()
+rbf_nn.fit(X_train, y_train, center_initializer='k_means')
+end_time = time.perf_counter()
+
+# confusion matrix for train data 
+y_pred_train = rbf_nn.predict(X_train)
+cm = confusion_matrix(y_train, y_pred_train)
+class_names = ['airplane', 'automobile', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+    
+heatmap_1 = sns.heatmap(
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
+heatmap_1.set_title("confusion matrix")
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+ # print(classification_report(batch_y, output_for_matrix))
+plt.show()
+
+# accuracy for train data 
+accuracy = accuracy_score(y_train, y_pred_train) 
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+y_pred = rbf_nn.predict(X_test)
+
+cm = confusion_matrix(y_test, y_pred)
+class_names = ['airplane', 'automobile', 'bird', 'cat',
+               'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+    
+heatmap_1 = sns.heatmap(
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
+heatmap_1.set_title("confusion matrix test")
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+ # print(classification_report(batch_y, output_for_matrix))
+plt.show()
+
+accuracy = accuracy_score(y_test, y_pred) 
+print(f"Accuracy: {accuracy * 100:.2f}%")
+
+
+
+print('elapsed time ' , end_time-start_time)
+print(classification_report(y_test, y_pred))
+
 
 #%% pytorch
 
-rbf_nn_tensor = RBFNeuralNetwork_torch(n_centers=100, rbf_width=8.0)
-rbf_nn_tensor.fit(X_train, y_train, center_initializer='random', lr=0.05, epochs=100 , optimizer='adam')
+rbf_nn_tensor = RBFNeuralNetwork_torch(n_centers=500, rbf_width=10.0)
+start_time = time.perf_counter()
+rbf_nn_tensor.fit(X_train, y_train, center_initializer='random', lr=0.005, epochs=150 , optimizer='adam')
+end_time = time.perf_counter() 
 
 #%% predictions
 
+
 # Make predictions on test set
-y_pred = rbf_nn.predict(X_test)
+y_pred = rbf_nn_tensor.predict(X_test)
 
 # Evaluate the model
 accuracy = accuracy_score(y_test, y_pred) 
 print(f"Accuracy: {accuracy * 100:.2f}%")
 
 print(classification_report(y_test, y_pred))
-
-
-#%% confusion matrix 
+print('elapsed time ' , end_time-start_time)
+# confusion matrix 
 
 cm = confusion_matrix(y_test, y_pred)
 class_names_selected = ['airplane', 'automobile', 'bird', 'cat',
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 heatmap_1 = sns.heatmap(
-     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names_selected, yticklabels=class_names_selected)
+     cm, annot=True, fmt='d', cmap='YlGnBu', xticklabels=class_names, yticklabels=class_names)
 heatmap_1.set_title("confusion matrix for neural network TEST")
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
