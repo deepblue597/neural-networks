@@ -2,7 +2,7 @@
 """
 Created on Wed Jan  3 23:15:59 2024
 
-@author: iason
+@author: iasonas kakandris 
 """
 
 import numpy as np
