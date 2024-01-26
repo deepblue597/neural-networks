@@ -1,5 +1,5 @@
 # neural-networks
 
-create a mutlilayer perceptron and compare it to knn neihbours and Centroid neighboor
+Createion of a mutlilayer perceptron, different types of SVM, and rbf neural network and compare it to knn neighbors and Centroid neighbors
 
-Fruthermore create a Support Virtual Machine and compare it with COTS SVMs from the sklearn library.
+
